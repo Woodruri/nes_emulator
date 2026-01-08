@@ -10,8 +10,6 @@ Bit 5: Always set 1, unused
 Bit 6:Overflow flag: set if during arithmetic op, invalid 2s complement is returned
 Bit 7:Negative flag: set if result of last op had a 7th bit set to 1 */
 
-use std::ops::Add;
-
 const CARRY_FLAG:u8 = 0b0000_0001;
 const ZERO_FLAG:u8 = 0b0000_0010;
 const INTERRUPT_DISABLE:u8 = 0b0000_0100;
