@@ -42,7 +42,7 @@ pub struct CPU {
     pub register_y: u8,
     pub status: u8,
     pub program_counter: u16,
-    memory: [u8; 0xFFFF],
+    memory: [u8; 0x10000],
 }
 
 //for little endian architecutre of NES :(
@@ -84,7 +84,7 @@ impl CPU {
             register_y: 0,
             status: 0,
             program_counter: 0,
-            memory: [0 ; 0xFFFF],
+            memory: [0 ; 0x10000],
         }
     }
 
@@ -96,6 +96,7 @@ impl CPU {
     pub fn reset(&mut self) {
         self.register_a = 0;
         self.register_x = 0;
+        self.register_y = 0;
         self.status = 0;
 
         //NES is defined to read the PC from 0xFFFC on reset
@@ -133,7 +134,8 @@ impl CPU {
                 }
                 //zero page
                 0xA5 => {
-                    self.lda(&AddressingMode::ZeroPage)
+                    self.lda(&AddressingMode::ZeroPage);
+                    self.program_counter += 1;
                 }
 
                 //TAX, transfer accumulator to X, implied
@@ -170,7 +172,7 @@ impl CPU {
 
     //0xE8
     fn inx(&mut self) {
-        self.register_x += 1;
+        self.register_x = self.register_x.wrapping_add(1);
         self.update_zero_and_negative_flags(self.register_x);
     }
 
@@ -222,13 +224,14 @@ impl CPU {
                 let hi = self.mem_read((ptr.wrapping_add(1)) as u16);
                 (hi as u16) << 8 | (lo as u16)
             }
+            //dereferences zero page pointer, then adds Y to the resulting address
             AddressingMode::Indirect_Y => {
-                let base = self.mem_read_u16(self.program_counter);
+                let ptr = self.mem_read(self.program_counter);
 
-                let ptr:u8 = (base as u8).wrapping_add(self.register_y);
                 let lo = self.mem_read(ptr as u16);
                 let hi = self.mem_read(ptr.wrapping_add(1) as u16);
-                (hi as u16) | (lo as u16)
+                let deref_base = (hi as u16) << 8 | (lo as u16);
+                deref_base.wrapping_add(self.register_y as u16)
             }
             AddressingMode::NoneAddressing => {
                 panic!("mode {:?}is not supported", mode);
@@ -291,7 +294,6 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "attempt to add with overflow")]
     fn test_0xe8_inx_overflow() {
         let mut cpu = CPU::new();
         let instruction_set = vec![0xa9, 0xff, 0xaa, 0xe8, 0xe8, 0x00];
